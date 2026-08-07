@@ -1,0 +1,62 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  --color-fiori-bg: #f5f7fa;
+  --color-fiori-surface: #ffffff;
+  --color-fiori-border: #e5e9ee;
+  --color-fiori-ink: #1b2733;
+  --color-fiori-muted: #5b7184;
+
+  --color-brand-50: #eef6ff;
+  --color-brand-100: #d6ebff;
+  --color-brand-500: #0070f2;
+  --color-brand-600: #0060d0;
+  --color-brand-700: #0050ad;
+
+  --color-success-50: #eafbf3;
+  --color-success-100: #c8f3dc;
+  --color-success-500: #1ea865;
+  --color-success-700: #128249;
+
+  --color-warn-50: #fff6e6;
+  --color-warn-100: #ffe7b3;
+  --color-warn-500: #e8941a;
+  --color-warn-700: #b9721a;
+
+  --color-danger-50: #fdeceb;
+  --color-danger-100: #f9d2cd;
+  --color-danger-500: #d9534f;
+  --color-danger-700: #a83a36;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-fiori-bg);
+  color: var(--color-fiori-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes drawer-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.animate-drawer-in {
+  animation: drawer-in 0.22s ease-out;
+}
+
+@keyframes row-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-row-in {
+  animation: row-in 0.25s ease-out both;
+}
