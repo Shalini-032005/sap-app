@@ -8,6 +8,7 @@ import {
   Clock3,
   User,
   ChevronRight,
+  Lock,
 } from "lucide-react";
 
 import orders from "@/data/orders.json";
@@ -36,7 +37,7 @@ type Order = {
 
 type Filter = "All" | RiskLevel;
 
-const orderData = orders as Order[];
+const initialOrderData = orders as Order[];
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -90,7 +91,6 @@ const getAIRiskAssessment = (order: any): AIRiskAssessment => {
       riskBadgeColor: "bg-amber-100 text-amber-800 border-amber-300",
     };
   }
-
   return {
     recommendation: "AUTO-RELEASE APPROVED",
     explanation:
@@ -100,60 +100,77 @@ const getAIRiskAssessment = (order: any): AIRiskAssessment => {
   };
 };
 
+// =========================================================
+// BUSINESS VALIDATION CONSTANTS
+// =========================================================
+const CREDIT_CEILING_PERCENT = 120;
+const CFO_OVERRIDE_CODE = "CFO-2026";
+
+// =========================================================
+// KPI BASELINE / TARGET BENCHMARKS
+// Named, quantified process metrics used on the summary tiles.
+// Baselines reflect the pre-automation manual credit-release
+// process; targets reflect the projected state once this
+// workbench + AI copilot are in production.
+// =========================================================
+const DSO_BASELINE_DAYS = 24.5;
+const DSO_TARGET_DAYS = 18.2;
+const DSO_REDUCTION_PERCENT =
+  ((DSO_BASELINE_DAYS - DSO_TARGET_DAYS) / DSO_BASELINE_DAYS) * 100;
+
+const OTIF_BASELINE_PERCENT = 91.4;
+const OTIF_TARGET_PERCENT = 97.8;
+const OTIF_IMPROVEMENT_POINTS =
+  OTIF_TARGET_PERCENT - OTIF_BASELINE_PERCENT;
+
 export default function App() {
+  // Orders are now held in state so approvals/releases can mutate status
+  const [orderList, setOrderList] = useState<Order[]>(initialOrderData);
+
   // First order is selected by default
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(
-    orderData[0] ?? null
+    initialOrderData[0] ?? null
   );
 
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
 
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    variant: "success" | "error" | "info";
+  } | null>(null);
+
+  // CFO override modal state
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [overrideKey, setOverrideKey] = useState("");
+  const [overrideError, setOverrideError] = useState("");
+
+  // Orders still awaiting action (released orders drop out of the queue/KPIs)
+  const activeOrders = useMemo(
+    () => orderList.filter((order) => order.status !== "RELEASED"),
+    [orderList]
+  );
 
   // Filter Release Queue dynamically
   const filteredOrders = useMemo(() => {
     if (activeFilter === "All") {
-      return orderData;
+      return activeOrders;
     }
 
-    return orderData.filter(
+    return activeOrders.filter(
       (order) => order.riskLevel === activeFilter
     );
-  }, [activeFilter]);
+  }, [activeOrders, activeFilter]);
 
   // KPI calculations
   const totalBlockedValue = useMemo(() => {
-    return orderData.reduce(
+    return activeOrders.reduce(
       (total, order) => total + order.orderValue,
       0
     );
-  }, []);
+  }, [activeOrders]);
 
-  const averageQueueHours = useMemo(() => {
-    const totalHours = orderData.reduce((total, order) => {
-      const parts = order.timeInQueue.split(" ");
-
-      let hours = 0;
-
-      parts.forEach((part) => {
-        if (part.endsWith("h")) {
-          hours += Number(part.replace("h", ""));
-        }
-
-        if (part.endsWith("m")) {
-          hours += Number(part.replace("m", "")) / 60;
-        }
-      });
-
-      return hours;
-    }, 0);
-
-    return orderData.length
-      ? totalHours / orderData.length
-      : 0;
-  }, []);
-
-  const highRiskCount = orderData.filter(
+  // Decrements automatically as High risk orders are released
+  const highRiskCount = activeOrders.filter(
     (order) => order.riskLevel === "High"
   ).length;
 
@@ -185,24 +202,101 @@ export default function App() {
     return "bg-emerald-500";
   };
 
-  const handleAction = (
-    action: "approve" | "reject" | "override"
+  const showToast = (
+    message: string,
+    variant: "success" | "error" | "info" = "info"
   ) => {
-    if (!selectedOrder) return;
+    setToast({ message, variant });
 
-    const messages = {
-      approve: `Credit release approved for ${selectedOrder.salesOrderId}`,
-      reject: `Order ${selectedOrder.salesOrderId} has been rejected`,
-      override: `Management override requested for ${selectedOrder.salesOrderId}`,
-    };
-
-    setToast(messages[action]);
-
-    // Automatically hide toast
     setTimeout(() => {
       setToast(null);
     }, 3500);
   };
+
+  // =========================================================
+  // ORDER RELEASE — mutates orderList + syncs selectedOrder
+  // =========================================================
+  const releaseOrder = (
+    salesOrderId: string,
+    viaOverride: boolean = false
+  ) => {
+    setOrderList((prev) =>
+      prev.map((order) =>
+        order.salesOrderId === salesOrderId
+          ? { ...order, status: "RELEASED" }
+          : order
+      )
+    );
+
+    setSelectedOrder((prev) =>
+      prev && prev.salesOrderId === salesOrderId
+        ? { ...prev, status: "RELEASED" }
+        : prev
+    );
+
+    showToast(
+      viaOverride
+        ? `CFO override accepted. Credit release approved for ${salesOrderId}`
+        : `Credit release approved for ${salesOrderId}`,
+      "success"
+    );
+  };
+
+  // =========================================================
+  // APPROVE BUTTON — enforces the 120% credit ceiling
+  // =========================================================
+  const handleApproveClick = () => {
+    if (!selectedOrder) return;
+
+    const exposureRatio =
+      (selectedOrder.currentExposure / selectedOrder.creditLimit) * 100;
+
+    if (exposureRatio > CREDIT_CEILING_PERCENT) {
+      // Block direct release — require CFO override
+      setOverrideKey("");
+      setOverrideError("");
+      setShowOverrideModal(true);
+      return;
+    }
+
+    releaseOrder(selectedOrder.salesOrderId);
+  };
+
+  const handleOverrideSubmit = () => {
+    if (!selectedOrder) return;
+
+    if (overrideKey.trim().toUpperCase() === CFO_OVERRIDE_CODE) {
+      releaseOrder(selectedOrder.salesOrderId, true);
+      setShowOverrideModal(false);
+      setOverrideKey("");
+      setOverrideError("");
+    } else {
+      setOverrideError(
+        "Invalid override key. Enter a valid CFO approval code to proceed."
+      );
+    }
+  };
+
+  const closeOverrideModal = () => {
+    setShowOverrideModal(false);
+    setOverrideKey("");
+    setOverrideError("");
+  };
+
+  const handleAction = (action: "reject" | "override") => {
+    if (!selectedOrder) return;
+
+    const messages = {
+      reject: `Order ${selectedOrder.salesOrderId} has been rejected`,
+      override: `Management override requested for ${selectedOrder.salesOrderId}`,
+    };
+
+    showToast(messages[action], action === "reject" ? "error" : "info");
+  };
+
+  const selectedExposureRatio = selectedOrder
+    ? (selectedOrder.currentExposure / selectedOrder.creditLimit) * 100
+    : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f5f7f9] text-slate-900">
@@ -251,49 +345,67 @@ export default function App() {
       <main className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col gap-5 overflow-hidden p-4 sm:p-6">
 
         {/* =====================================================
-            KPI BAR
+            KPI BAR — quantified baseline vs. target impact
         ===================================================== */}
-        <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
-              Blocked Order Value
+          {/* KPI 1: Blocked Revenue */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Total Blocked Revenue
             </p>
 
-            <p className="mt-2 text-2xl font-bold text-slate-900">
+            <p className="mt-1 text-2xl font-bold text-slate-900">
               {formatCurrency(totalBlockedValue)}
             </p>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Across {orderData.length} blocked orders
+            <p className="mt-1 text-xs font-medium text-amber-600">
+              ⚠️ {activeOrders.length} order
+              {activeOrders.length === 1 ? "" : "s"} requiring manual
+              decision{highRiskCount > 0 ? ` (${highRiskCount} High Risk)` : ""}
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
-              Avg. Resolution Time
+          {/* KPI 2: DSO Impact */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              Target DSO Reduction
             </p>
 
-            <p className="mt-2 text-2xl font-bold text-slate-900">
-              {averageQueueHours.toFixed(1)}h
-            </p>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-900">
+                {DSO_TARGET_DAYS.toFixed(1)} Days
+              </span>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Current queue average
+              <span className="text-xs font-bold text-emerald-600">
+                ↓ {DSO_REDUCTION_PERCENT.toFixed(0)}% vs Baseline (
+                {DSO_BASELINE_DAYS.toFixed(1)}d)
+              </span>
+            </div>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Accelerating cash application flow
             </p>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-medium text-slate-500">
-              High Risk Orders
+          {/* KPI 3: OTIF Adherence */}
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-semibold uppercase text-slate-500">
+              OTIF Delivery Adherence
             </p>
 
-            <p className="mt-2 text-2xl font-bold text-red-600">
-              {highRiskCount}
-            </p>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="text-2xl font-bold text-slate-900">
+                {OTIF_TARGET_PERCENT.toFixed(1)}%
+              </span>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Require priority review
+              <span className="text-xs font-bold text-emerald-600">
+                ↑ +{OTIF_IMPROVEMENT_POINTS.toFixed(1)}% projected
+              </span>
+            </div>
+
+            <p className="mt-1 text-xs text-slate-400">
+              Prevents dispatch cut-off delays
             </p>
           </div>
 
@@ -555,6 +667,14 @@ export default function App() {
                     </p>
 
                   </div>
+
+                  {/* Released confirmation banner */}
+                  {selectedOrder.status === "RELEASED" && (
+                    <div className="mt-4 flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+                      <CheckCircle2 size={16} />
+                      This order has been released.
+                    </div>
+                  )}
 
                 </div>
 
@@ -843,43 +963,39 @@ export default function App() {
                 {/* =================================================
                     ACTIONS
                 ================================================= */}
-                <div className="border-t border-slate-200 bg-white p-4">
+                {selectedOrder.status !== "RELEASED" && (
+                  <div className="border-t border-slate-200 bg-white p-4">
 
-                  <div className="grid gap-2">
+                    <div className="grid gap-2">
 
-                    <button
-                      onClick={() =>
-                        handleAction("approve")
-                      }
-                      className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                    >
-                      <CheckCircle2 size={17} />
-                      Approve Credit Release
-                    </button>
+                      <button
+                        onClick={handleApproveClick}
+                        className="flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                      >
+                        <CheckCircle2 size={17} />
+                        Approve Credit Release
+                      </button>
 
-                    <button
-                      onClick={() =>
-                        handleAction("reject")
-                      }
-                      className="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100"
-                    >
-                      <XCircle size={17} />
-                      Reject Order
-                    </button>
+                      <button
+                        onClick={() => handleAction("reject")}
+                        className="flex items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                      >
+                        <XCircle size={17} />
+                        Reject Order
+                      </button>
 
-                    <button
-                      onClick={() =>
-                        handleAction("override")
-                      }
-                      className="flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-                    >
-                      <ShieldAlert size={17} />
-                      Request Management Override
-                    </button>
+                      <button
+                        onClick={() => handleAction("override")}
+                        className="flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                      >
+                        <ShieldAlert size={17} />
+                        Request Management Override
+                      </button>
+
+                    </div>
 
                   </div>
-
-                </div>
+                )}
               </>
             )}
 
@@ -889,18 +1005,121 @@ export default function App() {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-500">
-          Showing {filteredOrders.length} of {orderData.length} blocked
+          Showing {filteredOrders.length} of {activeOrders.length} blocked
           orders · {formatCurrency(totalBlockedValue)} under review
         </p>
 
       </main>
 
       {/* =========================================================
+          CFO OVERRIDE MODAL — 120% CREDIT CEILING BLOCK
+      ========================================================= */}
+      {showOverrideModal && selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+
+          <div className="w-full max-w-md rounded-xl border border-red-300 bg-white shadow-2xl">
+
+            {/* Red alert banner */}
+            <div className="flex items-start gap-3 rounded-t-xl border-b border-red-200 bg-red-50 p-4">
+
+              <ShieldAlert
+                size={22}
+                className="mt-0.5 shrink-0 text-red-600"
+              />
+
+              <div>
+                <p className="text-sm font-bold text-red-700">
+                  CRITICAL BLOCK: Order exceeds {CREDIT_CEILING_PERCENT}%
+                  credit ceiling.
+                </p>
+
+                <p className="mt-1 text-sm text-red-700">
+                  Standard release prohibited. Mandatory CFO approval
+                  code required.
+                </p>
+
+                <p className="mt-2 text-xs font-medium text-red-600">
+                  Order {selectedOrder.salesOrderId} · Exposure at{" "}
+                  {selectedExposureRatio.toFixed(1)}% of credit limit
+                </p>
+              </div>
+
+            </div>
+
+            {/* Override key input */}
+            <div className="p-5">
+
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Manager Override Key
+              </label>
+
+              <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 focus-within:border-blue-500">
+
+                <Lock size={16} className="text-slate-400" />
+
+                <input
+                  type="text"
+                  value={overrideKey}
+                  onChange={(e) => {
+                    setOverrideKey(e.target.value);
+                    if (overrideError) setOverrideError("");
+                  }}
+                  placeholder="e.g. CFO-2026"
+                  className="w-full text-sm text-slate-800 outline-none placeholder:text-slate-400"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleOverrideSubmit();
+                  }}
+                />
+
+              </div>
+
+              {overrideError && (
+                <p className="mt-2 text-xs font-medium text-red-600">
+                  {overrideError}
+                </p>
+              )}
+
+              <div className="mt-5 grid grid-cols-2 gap-2">
+
+                <button
+                  onClick={closeOverrideModal}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleOverrideSubmit}
+                  className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                >
+                  Unlock Release
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* =========================================================
           TOAST
       ========================================================= */}
       {toast && (
-        <div className="fixed bottom-5 right-5 z-50 max-w-sm rounded-lg bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-xl">
-          {toast}
+        <div
+          className={`fixed bottom-5 right-5 z-50 flex max-w-sm items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium text-white shadow-xl ${
+            toast.variant === "success"
+              ? "bg-emerald-600"
+              : toast.variant === "error"
+              ? "bg-red-600"
+              : "bg-slate-900"
+          }`}
+        >
+          {toast.variant === "success" && <CheckCircle2 size={16} />}
+          {toast.variant === "error" && <XCircle size={16} />}
+          {toast.message}
         </div>
       )}
 
