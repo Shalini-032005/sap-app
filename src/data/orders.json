@@ -1,0 +1,191 @@
+[
+{
+"salesOrderId": "SO-48213",
+"customerBP": "Northwind Traders GmbH",
+"customerId": "BP-100492",
+"creditLimit": 50000,
+"currentExposure": 59000,
+"orderValue": 84200,
+"status": "CREDIT_BLOCKED",
+"blockReason": "Credit limit exceeded by 18%",
+"riskLevel": "High",
+"timeInQueue": "7h 24m",
+"lineItems": [
+{
+"materialId": "MAT-100045",
+"description": "Industrial Safety Scanner",
+"qty": 20,
+"netPrice": 1850
+},
+{
+"materialId": "MAT-100078",
+"description": "RFID Warehouse Gateway",
+"qty": 12,
+"netPrice": 3950
+}
+],
+"paymentHistory": "Avg 22 days past due, 2 previous blocks resolved"
+},
+{
+"salesOrderId": "SO-48214",
+"customerBP": "Contoso Retail Ltd",
+"customerId": "BP-100731",
+"creditLimit": 100000,
+"currentExposure": 112500,
+"orderValue": 31800,
+"status": "CREDIT_BLOCKED",
+"blockReason": "Payment term deviation requested; exposure exceeds credit limit by 12.5%",
+"riskLevel": "Medium",
+"timeInQueue": "2h 06m",
+"lineItems": [
+{
+"materialId": "MAT-200112",
+"description": "POS Terminal",
+"qty": 30,
+"netPrice": 650
+},
+{
+"materialId": "MAT-200145",
+"description": "Barcode Scanner",
+"qty": 24,
+"netPrice": 525
+}
+],
+"paymentHistory": "Avg 8 days past due, 1 previous block resolved"
+},
+{
+"salesOrderId": "SO-48215",
+"customerBP": "Fabrikam Holdings",
+"customerId": "BP-100884",
+"creditLimit": 75000,
+"currentExposure": 78000,
+"orderValue": 15600,
+"status": "CREDIT_BLOCKED",
+"blockReason": "Account flagged for credit review",
+"riskLevel": "High",
+"timeInQueue": "11h 45m",
+"lineItems": [
+{
+"materialId": "MAT-300201",
+"description": "Warehouse Conveyor Module",
+"qty": 4,
+"netPrice": 2400
+},
+{
+"materialId": "MAT-300219",
+"description": "Industrial Control Panel",
+"qty": 2,
+"netPrice": 3000
+}
+],
+"paymentHistory": "Avg 31 days past due, 3 previous blocks resolved"
+},
+{
+"salesOrderId": "SO-48220",
+"customerBP": "Tailspin Toys Inc",
+"customerId": "BP-101105",
+"creditLimit": 25000,
+"currentExposure": 22000,
+"orderValue": 9450,
+"status": "CREDIT_BLOCKED",
+"blockReason": "Minor credit hold pending payment confirmation",
+"riskLevel": "Low",
+"timeInQueue": "35m",
+"lineItems": [
+{
+"materialId": "MAT-400055",
+"description": "Retail Display Unit",
+"qty": 15,
+"netPrice": 330
+},
+{
+"materialId": "MAT-400081",
+"description": "Electronic Price Label Kit",
+"qty": 10,
+"netPrice": 450
+}
+],
+"paymentHistory": "Avg 3 days past due, no previous credit blocks"
+},
+{
+"salesOrderId": "SO-48221",
+"customerBP": "Adventure Works Cycles",
+"customerId": "BP-101247",
+"creditLimit": 60000,
+"currentExposure": 81000,
+"orderValue": 42750,
+"status": "CREDIT_BLOCKED",
+"blockReason": "Severe credit breach: exposure exceeds 130% of credit limit",
+"riskLevel": "High",
+"timeInQueue": "14h 12m",
+"lineItems": [
+{
+"materialId": "MAT-500310",
+"description": "Electric Cargo Bicycle",
+"qty": 10,
+"netPrice": 2850
+},
+{
+"materialId": "MAT-500327",
+"description": "Commercial Bicycle Service Kit",
+"qty": 15,
+"netPrice": 950
+}
+],
+"paymentHistory": "Avg 46 days past due, 4 previous blocks resolved"
+},
+{
+"salesOrderId": "SO-48222",
+"customerBP": "Alpine Ski House",
+"customerId": "BP-101392",
+"creditLimit": 150000,
+"currentExposure": 142000,
+"orderValue": 98000,
+"status": "CREDIT_BLOCKED",
+"blockReason": "VIP customer order exceeds automated release threshold; manual credit approval required",
+"riskLevel": "Medium",
+"timeInQueue": "1h 18m",
+"lineItems": [
+{
+"materialId": "MAT-600415",
+"description": "Commercial Snow Sports Equipment",
+"qty": 40,
+"netPrice": 1450
+},
+{
+"materialId": "MAT-600432",
+"description": "Premium Ski Rental System",
+"qty": 20,
+"netPrice": 2000
+}
+],
+"paymentHistory": "Avg 2 days past due, no previous credit blocks; VIP payment status"
+},
+{
+"salesOrderId": "SO-48223",
+"customerBP": "Blue Yonder Logistics",
+"customerId": "BP-101518",
+"creditLimit": 120000,
+"currentExposure": 118500,
+"orderValue": 27500,
+"status": "CREDIT_BLOCKED",
+"blockReason": "Credit utilization above 98%; release requires credit analyst review",
+"riskLevel": "Medium",
+"timeInQueue": "5h 32m",
+"lineItems": [
+{
+"materialId": "MAT-700512",
+"description": "Fleet Tracking Gateway",
+"qty": 10,
+"netPrice": 1250
+},
+{
+"materialId": "MAT-700529",
+"description": "Logistics IoT Sensor Pack",
+"qty": 25,
+"netPrice": 600
+}
+],
+"paymentHistory": "Avg 12 days past due, 1 previous block resolved"
+}
+]
