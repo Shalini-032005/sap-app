@@ -6,16 +6,12 @@
     "module": "nodenext",
     "types": ["node"],
     "skipLibCheck": true,
-
-    /* Bundler mode */
     "allowImportingTsExtensions": true,
     "moduleDetection": "force",
     "noEmit": true,
-
-    /* Linting */
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "vite.config.js"]
+  "include": ["vite.config.ts", "vite.config.js", "src/**/*"]
 }
